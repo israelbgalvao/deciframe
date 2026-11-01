@@ -14,7 +14,9 @@ class Musica:
             self.popularidade = popularidade
             self.tom = tom
             self.cifra = cifra
+            self.cifra_minuscula = [acorde.lower() for acorde in cifra]
             self.acordes = list(set(cifra))
+            self.acordes_minusculos = set(self.cifra_minuscula)
             self.seqs_famosas = seqs_famosas
 
             self.id_unico_musica = '%s_%s' % (id_artista, id_musica)

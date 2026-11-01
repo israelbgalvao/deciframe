@@ -1,40 +1,11 @@
 angular.module('deciframeApp').controller('SequenciaController', function($http, $window, ngProgressFactory, $anchorScroll, $location, GENEROS) {
-  var sequencia1 = {
-    'index': 1,
-    'acordes': [
-      { 'acorde': 'Bm', 'cor': '#2E1C74' },
-      { 'acorde': 'G',  'cor': '#2E1C74' },
-      { 'acorde': 'D',  'cor': '#2E1C74' },
-      { 'acorde': 'A',  'cor': '#2E1C74' }
-  ]};
-  var sequencia2 = {
-    'index': 1,
-    'acordes': [
-      { 'acorde': 'C',  'cor': '#2E1C74' },
-      { 'acorde': 'G',  'cor': '#2E1C74' },
-      { 'acorde': 'Am', 'cor': '#2E1C74' },
-      { 'acorde': 'F',  'cor': '#2E1C74' }
-  ]};
-  var sequencia3 = {
-    'index': 1,
-    'acordes': [
-      { 'acorde': 'Gm', 'cor': '#2E1C74' },
-      { 'acorde': 'F',  'cor': '#2E1C74' }
-  ]};
-  var sequencia4 = {
-    'index': 1,
-    'acordes': [
-      { 'acorde': 'C',  'cor': '#2E1C74' },
-      { 'acorde': 'C7', 'cor': '#2E1C74' },
-      { 'acorde': 'F',  'cor': '#2E1C74' },
-      { 'acorde': 'Fm', 'cor': '#2E1C74' }
-  ]};
   var vm = this;
+  var apiUrl = "";
+  var corPadrao = "#2E1C74";
+
   vm.sequenciasFamosas = [];
-  vm.sequenciasFamosas.push(sequencia1);
-  vm.sequenciasFamosas.push(sequencia2);
-  vm.sequenciasFamosas.push(sequencia3);
-  vm.sequenciasFamosas.push(sequencia4);
+  vm.novaSequencia = { nome: "", acordes: "" };
+  vm.mensagem = "";
   vm.minhaSequencia = {};
   vm.isSearching = false;
   vm.showSearchResultsCount = false;
@@ -43,6 +14,43 @@ angular.module('deciframeApp').controller('SequenciaController', function($http,
   vm.generos = GENEROS;
   vm.meuGenero = "";
   vm.progressbar = ngProgressFactory.createInstance();
+
+  var respostaJson = function(dados) {
+    if (typeof dados === "string") {
+      try {
+        return angular.fromJson(dados);
+      } catch (e) {
+        return {};
+      }
+    }
+    return dados || {};
+  };
+
+  var converterSequencia = function(sequencia) {
+    var acordes = [];
+    if (sequencia && sequencia.acordes) {
+      for (var i = 0; i < sequencia.acordes.length; i++) {
+        acordes.push({ acorde: sequencia.acordes[i], cor: corPadrao });
+      }
+    }
+    return {
+      nome: sequencia ? sequencia.nome : "",
+      acordes: acordes
+    };
+  };
+
+  var carregarSequencias = function() {
+    return $http.get(apiUrl.concat("sequencias")).then(function(response) {
+      var dados = respostaJson(response.data);
+      vm.sequenciasFamosas = [];
+      if (angular.isArray(dados)) {
+        for (var i = 0; i < dados.length; i++) {
+          vm.sequenciasFamosas.push(converterSequencia(dados[i]));
+        }
+      }
+      return vm.sequenciasFamosas;
+    });
+  };
 
   vm.temAcorde = function(acorde) {
     if (vm.minhaSequencia.acordes) {
@@ -69,7 +77,6 @@ angular.module('deciframeApp').controller('SequenciaController', function($http,
     vm.isSearching = true;
     vm.musics = [];
 
-    var apiUrl = "";
     var searchString = "similares?sequencia=".concat(createChordsString(vm.minhaSequencia.acordes));
     if (vm.meuGenero !== "" && vm.meuGenero !== null) {
       searchString += "&generos="+vm.meuGenero;
@@ -89,6 +96,28 @@ angular.module('deciframeApp').controller('SequenciaController', function($http,
       });
   }
 
+  vm.cadastrarSequencia = function() {
+    vm.mensagem = "";
+    return $http.post(apiUrl.concat("sequencias"), {
+      nome: vm.novaSequencia.nome,
+      acordes: vm.novaSequencia.acordes
+    }).then(function(response) {
+      var dados = respostaJson(response.data);
+      vm.mensagem = response.status === 201
+        ? "Sequência cadastrada!"
+        : "Essa sequência já existia.";
+      var sequencia = converterSequencia(dados.sequencia);
+      return carregarSequencias().then(function() {
+        if (sequencia.acordes.length) {
+          vm.pesquisarPorSequencia(sequencia);
+        }
+      });
+    }, function(response) {
+      var dados = respostaJson(response.data);
+      vm.mensagem = dados.erro || "Ops! Algo errado.";
+    });
+  };
+
   vm.limparPesquisa = function() {
     vm.minhaSequencia = {};
     vm.musics = [];
@@ -102,4 +131,6 @@ angular.module('deciframeApp').controller('SequenciaController', function($http,
     vm.showSearchResultsCount = false;
     $("body").animate({scrollTop: $("#results").offset().top}, "slow");
   };
+
+  carregarSequencias();
 });
